@@ -1,0 +1,129 @@
+pipeline {
+    agent any
+    environment{
+        VERSION = "${env.BUILD_ID}"
+    }
+    tools {
+        maven 'maven123'
+    }
+    options {
+        timestamps()
+        //discardbuilds 
+        buildDiscarder logRotator(artifactDaysToKeepStr: '30', artifactNumToKeepStr: '10', daysToKeepStr: '5', numToKeepStr: '5')
+    }
+    stages{
+        stage ('Git-checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Build source code') {
+            steps {
+                'mvn clean package'
+            }
+        }
+        stage("build & SonarQube analysis") {
+            steps {
+                withSonarQubeEnv('My SonarQube Server') {
+                    sh 'mvn clean package sonar:sonar'
+                }
+            }
+        }
+        stage("Quality Gate") {
+            steps {
+                timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('deploy artifact to jfrog') {
+            steps { 
+                
+            }
+        }
+        stage('Bulid dcoker image with artifact and push to jfrog') {
+            environment {
+                DOCKER_LOGIN = credentials('docker_login')
+            }
+            steps {
+                sh """
+                     //with above docker file we building the docker image
+					           docker build -t dhanapal406/tomcat_sai-$BUILD_NUMBER .
+                     docker login -u $DOCKER_LOGIN_USR -p $DOCKER_LOGIN_PSW
+                     docker push dhanapal406/tomcat_sai-$BUILD_NUMBER
+                     docker run -itd -p 8080:8080 -v /dhana:/l406/tomcat_sai-$BUILD_NUMBER
+                """
+            }
+            
+        }
+        stage('identifying misconfigs using datree in helm charts') {
+            script{
+                dir('kubernetes/') {
+                    withEnv(['DATREE_TOKEN=GJdx2cP2TCDyUY3EhQKgTc']) {
+                        sh 'helm datree test myapp/'
+                    }
+                }
+            }
+        }
+        stage('pushing the helm charts to jfrog') {
+            script{
+
+                    dir('kubernetes/') {
+                        withEnv(['DATREE_TOKEN=GJdx2cP2TCDyUY3EhQKgTc']) {
+                              sh 'helm datree test myapp/'
+                        }
+                    }
+                }
+            }
+        }
+        stage("pushing the helm charts to nexus"){
+            steps{
+                script{
+                    withCredentials([string(credentialsId: 'docker_pass', variable: 'docker_password')]) {
+                          dir('kubernetes/') {
+                             sh '''
+                                 helmversion=$( helm show chart myapp | grep version | cut -d: -f 2 | tr -d ' ')
+                                 tar -czvf  myapp-${helmversion}.tgz myapp/
+                                 curl -u admin:$docker_password http://34.125.214.226:8081/repository/helm-hosted/ --upload-file myapp-${helmversion}.tgz -v
+                            '''
+                          }
+                    }
+                }
+            }
+        }
+        stage('manual approval for deploy in k8s development environment') { 
+             steps {
+               script{
+                   withCredentials([kubeconfigFile(credentialsId: 'kubernetes-config', variable: 'KUBECONFIG')]) {
+                        dir('kubernetes/') {
+                          sh 'helm upgrade --install --set image.repository="34.125.214.226:8083/springapp" --set image.tag="${VERSION}" myjavaapp myapp/ ' 
+                        }
+                    }
+               }
+            }
+        }
+        stage('Deploying application on k8s cluster') {
+            steps{
+                script{
+                    withCredentials([kubeconfigFile(credentialsId: 'kubernetes-config', variable: 'KUBECONFIG')]) {
+                        sh 'kubectl run curl --image=curlimages/curl -i --rm --restart=Never -- curl myjavaapp-myapp:8080'
+                    }
+                }
+            }
+            
+        }
+        
+    }
+    post{
+        always {
+            junit '**/target/*.xml'
+            mail bcc: '', body: "<br>Project: ${env.JOB_NAME} <br>Build Number: ${env.BUILD_NUMBER} <br> URL de build: ${env.BUILD_URL}", cc: '', charset: 'UTF-8', from: '', mimeType: 'text/html', replyTo: '', subject: "${currentBuild.result} CI: Project name -> ${env.JOB_NAME}", to: "dhanapal703278@gmail.com";  
+        }
+        failure {
+            //mail to: team@example.com, subject: 'The Pipeline failed :('
+        }
+		sucess {
+			// mail to: dhanapal703278@gmail.com, subject: The Pipeline sucess 
+		}
+    }
+}

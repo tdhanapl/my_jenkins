@@ -1,0 +1,369 @@
+##########pipeline-1 running in slave node###########
+
+pipeline{
+    agent any
+    tools {
+        maven 'maven123'
+    }
+    stages{
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/dhanapal703278/maven.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh "mvn --version"
+                sh "mvn clean install -DskipTests" //DskipTests-it skip tests in this stage
+            }
+        }
+        stage('Test') {
+            steps {
+                sh "mvn test" //here we are running the tests in this stage
+                junit allowEmptyResults: true, testResults: 'target/surefire-reports-/*.xml'
+            }
+        }
+        
+        stage('Post tasks') {
+            steps {
+                sh "echo send an email"
+            }
+        }
+    }
+}
+##########pipeline-2 running on docker of another agent machine###########
+###build docker image with java, git, maven
+$ Dockerfile
+FROM ubuntu
+LABEL owner="dhanapal"
+LABEL Description="creating image with git, maven, java for docker-jenkins-slave"
+RUN  apt update -y \
+     && apt   install git -y \
+     && apt install wget -y \
+     && apt install openjdk-11-jdk -y \
+     &&  cd /opt \
+     && wget  https://dlcdn.apache.org/maven/maven-3/3.8.5/binaries/apache-maven-3.8.5-bin.tar.gz \
+     && tar -xvf apache-maven-3.8.5-bin.tar.gz \
+     && rm -rf apache-maven-3.8.5-bin.tar.gz  \
+     && mv apache-maven-3.8.5  maven \
+     && ln -s /opt/maven/bin/mvn /usr/bin/mvn \
+     && export PATH=$PATH:/opt/maven/bin \
+     &&  echo $PATH
+CMD  ["mvn", "--version"]
+
+$docker build --tag docker_with_java_git_maven-3.8.5 .
+$ docker image tag docker_with_java_git_maven-3.8.5 dhanapal406/jenkins_java_git_maven-3.8.5
+$ docker push dhanapal406/jenkins_java_git_maven-3.8.5
+->In Pugins we need install Docker Pipeline
+
+###docker-jenkinsfile
+pipeline{
+    agent {
+        docker { 
+            image 'dhanapal406/jenkins_java_git_maven-3.8.5' //docker image 
+            label 'docker-node' //agent label 
+        }
+    }
+    options {
+        //discardbuilds 
+        buildDiscarder logRotator(artifactDaysToKeepStr: '30', artifactNumToKeepStr: '10', daysToKeepStr: '5', numToKeepStr: '5')
+        
+    }
+    stages{
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/dhanapal703278/maven.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh "mvn --version"
+                sh "mvn clean install"
+            }
+        }
+    }
+}
+//optional add in docker agent 
+//agent {
+  //docker {
+    //alwaysPull true
+    //customWorkspace '/root'
+    //image 'dhanapal406/jenkins_java_git_maven-3.8.5'
+    //label 'docker-node'
+    //registryCredentialsId 'username=dhana, password=ikt@406'
+    //reuseNode true
+  }
+}
+
+:wq
+
+#################build-docker image in pipeline#######
+####create credential in 
+->Dashboard->click manage jenkins-> click manage Credentials
+->Stores scoped to Jenkins(under)
+->Jenkins
+->Global credentials (unrestricted)->New credentials
+->Kind= Username with password
+Block or Report
+￼
+->Scope= Global (Jenkins, nodes, items, all child items, etc)
+->Username= dhanapal406(mark Treat username as secret)
+->Password= •••••••••
+->ID= docker_login
+->Description= docker_login
+->click create
+###Dockerfile in github
+$ vim Dockerfile
+FROM tomcat
+RUN rm -rf /usr/local/tomcat/webapps/ROOT/
+COPY webapp.war /uELKsr/local/tomcat/webapps/ROOT/ 
+RUN cd /usr/local/tomcat/webapps/ROOT && unzip java-tomcat-maven-example.war && \
+    rm -rf /usr/local/tomcat/webapps/ROOT/java-tomcat-maven-example.war
+EXPOSE 8080
+CMD ["mvn", "run"]
+##
+-------------------
+-------------------
+pipeline{
+    agent none
+    environment {
+        DOCKER_LOGIN = credentials('docker_login')
+        
+    }
+    stages {
+        stage ('Checkout and Build') {
+            agent {
+                docker {
+                    image 'dhanapal406/jenkins_java_git_maven-3.8.5'
+                    label 'docker-node'
+                    
+                }
+                
+            }
+            steps{
+                git 'https://github.com/dhanapal703278/tomcat_maven_app.git'
+                sh "mvn clean package"
+            }
+        }
+        stage('Create  a images'){
+            agent {
+                label 'docker-node'
+            }
+            steps {
+                sh """
+                     docker build -t dhanapal406/tomcat_sai-$BUILD_NUMBER .
+                     docker login -u $DOCKER_LOGIN_USR -p $DOCKER_LOGIN_PSW
+                     docker push dhanapal406/tomcat_sai-$BUILD_NUMBER
+                     docker run -itd -p 8080:8080 dhanapal406/tomcat_sai-$BUILD_NUMBER
+                """
+            }
+        }
+    }
+}
+=================================================
+#############pipeline-3 with ############
+
+pipeline{
+    agent none
+    environment {
+        DOCKER_LOGIN = credentials('docker_login')
+        
+    }
+    tools {
+        maven 'maven123'
+    }
+    options {
+        timestamps()()
+        timeout(activity: true, time: 20)
+    }
+
+    
+    stages {
+        stage ('Checkout and Build') {
+            agent {
+                docker {
+                    image 'dhanapal406/jenkins_java_git_maven-3.8.5'
+                    label 'docker-node'
+                    
+                }
+                
+            }
+            steps{
+                git 'https://github.com/dhanapal703278/tomcat_maven_app.git'
+                sh "mvn clean package"
+            }
+        }
+        stage('Create  a images'){
+            agent {
+                label 'docker-node'
+            }
+            steps {
+                sh """
+                     docker build -t dhanapal406/tomcat_sai-$BUILD_NUMBER .
+                     docker login -u $DOCKER_LOGIN_USR -p $DOCKER_LOGIN_PSW
+                     docker push dhanapal406/tomcat_sai-$BUILD_NUMBER
+                     docker run -itd -p 8080:8080 dhanapal406/tomcat_sai-$BUILD_NUMBER
+                """
+            }
+        }
+    }
+}
+################pipeline for sonarqube scanner#########
+ pipeline {
+        agent none
+        stages {
+          stage("build & SonarQube analysis") {
+            agent any
+            steps {
+              withSonarQubeEnv('My SonarQube Server') {
+                sh 'mvn clean package sonar:sonar'
+              }
+            }
+          }
+          stage("Quality Gate") {
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+              }
+            }
+          }
+        }
+}
+
+###############################final pipeline##############
+ pipeline{
+    agent none
+	tools {
+        maven 'maven123'
+    }
+    options {
+        //discardbuilds 
+        buildDiscarder logRotator(artifactDaysToKeepStr: '30', artifactNumToKeepStr: '10', daysToKeepStr: '5', numToKeepStr: '5')
+        timeout(activity: true, time: 40)
+        retry(2)
+        timestamps()
+        warnError('Error messages')
+    }
+    environment {
+        remote_server_ip = "10.10.1.173 "
+        remote_username = "root"
+        DOCKER_LOGIN = credentials('docker_login')
+    }
+    stages{
+        stage ('Checkout and Build') {
+            agent {
+                docker {
+                    image 'dhanapal406/jenkins_java_git_maven-3.8.5'
+                    label 'docker-node'
+                    
+                }
+                
+            }
+            steps{
+                git 'https://github.com/dhanapal703278/tomcat_maven_app.git'
+                sh "mvn --version"
+                sh "mvn clean install -DskipTests" //DskipTests-it skip tests in this stage
+            }
+        }
+        stage('Test') {
+            agent {
+                docker {
+                    image 'dhanapal406/jenkins_java_git_maven-3.8.5'
+                    label 'docker-node'
+                    
+                }
+                
+            }
+            steps {
+                sh "mvn test" //here we are running the tests in this stage
+                junit allowEmptyResults: true, testResults: 'target/surefire-reports-/*.xml'
+            }
+        }
+        stage('work for remote server from jenkins') {
+            agent {
+                label 'docker-node'
+            }
+            steps {
+                sshagent(['sshagent-scp']) {
+                    sh """
+                    ssh  -o StrictHostKeyChecking=no  $remote_username@$remote_server_ip  mkdir /opt/jenkins88 ;rm -rf ~/dhana* ; touch ~/dhanafile90 ; rm -rf /opt/jenkins80   
+                    ssh  -o StrictHostKeyChecking=no  $remote_username@$remote_server_ip cat /etc/sudoers
+                    """ 
+                    
+                }
+                
+            }
+        }
+        /*
+        stage("build & SonarQube analysis") {
+            agent any
+            steps {
+                withSonarQubeEnv('My SonarQube Server') {
+                    sh 'mvn clean package sonar:sonar'
+                    
+                } 
+            }
+        }
+        stage("Quality Gate") {
+            agent any
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+              }
+            }
+        }
+Block or Report
+￼
+        */
+        stage('copy jar or war from master to agent') {
+            agent {
+                label 'docker-node'
+            }
+            steps {
+                //if we  build is run on server and deploy in another server for it requried jar or war
+                sshagent(['sshagent-scp']) {
+                    /*<packaging>jar</packaging>
+                    <version>1.0-SNAPSHOT</version>
+                    <name>my-app</name>
+                    above are in pom.xml
+					-o StrictHostKeyChecking=no  is do not hostkey check promot for yes or no while copying file
+					*/
+                    sh " scp -o StrictHostKeyChecking=no  target/java-tomcat-maven-example.war root@10.10.1.173:/opt/pipeline-repo/"
+                }
+            }
+                
+        }
+        stage('create Image') {
+            agent {
+                label 'docker-node'
+            }
+            steps {
+                sh """
+                    docker build -t dhanapal406/tomcat-$BUILD_NUMBER .
+                    docker login -u $DOCKER_LOGIN_USR -p $DOCKER_LOGIN_PSW
+                    docker push dhanapal406/tomcat-$BUILD_NUMBER
+                    docker run -itd -p 8080:8080 dhanapal406/tomcat-$BUILD_NUMBER
+                """
+            }
+        }
+        
+    }
+}
+
+##############################gathering pipeline snytax from github######
+stage('Upload to AWS-S3') {
+            steps {
+                withAWS(region:'us-east-2',credentials:'AWS Credentials') {
+                    s3Upload(pathStyleAccessEnabled:true, payloadSigningEnabled: true, file:'index.html', bucket:'static-jenkins-pipelines-on-aws')
+                }
+            }
+--------------------
+
+post{
+    always{
+        junit 'build/test-results/test/TEST-*.xml' or  junit **/target/*-reports/TEST-*.xml' 
+        jacoco execPattern: 'build/jacoco/test.exec'
+
+    }
+}ELK
+------

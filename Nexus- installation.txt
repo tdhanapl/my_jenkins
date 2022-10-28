@@ -1,0 +1,73 @@
+1.	Remove older version of java and install latest version:
+yum remove java* -y
+sudo yum install java-1.8.0 java-1.8.0-openjdk-devel -y
+3.	Download and setup nexus stable version
+cd /opt
+wget -O nexus.tar.gz https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+tar -zxvf nexus-3.0.2-02-unix.tar.gz
+mv /opt/nexus-3.0.2-02 /opt/nexus
+
+7.	As a good security practice, it is not advised to run nexus service as root. so create new user called nexus and grant sudo access to manage nexus services
+8.	sudo adduser nexus
+9.	# visudo \\ nexus ALL=(ALL) NOPASSWD: ALL
+sudo chown -R nexus:nexus /opt/nexus
+10.	Open /opt/nexus/bin/nexus.rc file, uncomment run_as_user parameter and set it as following.
+vi /opt/nexus/bin/nexus.rc
+run_as_user="nexus" (file shold have only this line)
+
+[root@ip-172-31-43-201 ~]# chown -R nexus:nexus /opt/sonatype-work
+[root@ip-172-31-43-201 ~]# chown -R nexus:nexus /opt/nexus
+
+11.Modify memory settings
+
+sudo vim /opt/nexus/bin/nexus.vmoptions
+-Xms512m
+-Xmx512m
+-XX:MaxDirectMemorySize=512m
+-XX:+UnlockDiagnosticVMOptions
+-XX:+LogVMOutput
+
+Add all the below changes the file with below highlighted entry:
+
+12.	Add nexus as a service at boot time
+sudo ln -s /opt/nexus/bin/nexus /etc/init.d/nexus
+		or 
+Configure Nexus to run as a service
+sudo vim /etc/systemd/system/nexus.service
+Copy the below content.
+
+[Unit]
+Description=nexus service
+After=network.target
+
+[Service]
+Type=forking
+LimitNOFILE=65536
+User=nexus
+Group=nexus
+ExecStart=/opt/nexus/bin/nexus start
+ExecStop=/opt/nexus/bin/nexus stop
+User=nexus
+Restart=on-abort
+[Install]
+WantedBy=multi-user.target
+
+Now Start Nexus
+
+sudo systemctl enable nexus
+
+sudo systemctl start nexus
+
+sudo systemctl status nexus
+
+If it says stopped, review the steps above and you can troubleshoot by looking into Nexus logs by executing below command:
+
+tail -f /opt/sonatype-work/nexus3/log/nexus.log
+
+
+
+13.	Login nexus server from browser on port 8081
+http://<Nexus_server>:8081
+14.	Use default credentials to login
+15.	username : admin
+password : admin123

@@ -1,0 +1,23 @@
+#########
+####reverse proxy configuration link
+#https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/
+upstream jenkins {
+    #server <server-ip-address:8080>;
+	server 35.154.4.51:8080; 
+}
+server {
+    listen       80 default;
+    server_name   jenkins.cntech.local; # replace 'jenkins.cntech.local' with your server domain name
+	
+	access_log   /var/log/jenkins.access.log;
+	error_log   /var/log/jenkins.error.log;
+location / {
+    proxy_buffers 16 4k;
+    proxy_buffer_size 2k;
+    proxy_set_header Accept-Encoding "";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_pass http://jenkins;
+
+	}
+}
