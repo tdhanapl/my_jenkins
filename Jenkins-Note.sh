@@ -1080,6 +1080,7 @@ pipeline{
         IMAGE_REPO_NAME="myown-docker-repository"
         IMAGE_TAG="v2.2"
         REPOSITORY_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+        HELM_PACKAGE_NAME = "helm-test-chart"
     }
     tools {
             maven 'maven-3.8.6'
@@ -1126,9 +1127,114 @@ pipeline{
             }
             
         }
+          
+    }
+}
 
+#############helm chart and push to s3/ECR in pipeline################
+#####helm Chart repository create in S3 AWS
+## Install the Helm v3 client.	
+-->To download and install the Helm client on your local system, run the following command: 
+$ sudo curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+##Initialize an S3 bucket as a Helm repository
+##Create an S3 bucket for Helm charts.
+-->Create a unique S3 bucket. 
+-->In the bucket, create a folder called stable/myapp.
+-->The example in this pattern uses s3://my-helm-charts/stable/myapp as the target chart repository.
+##Install the helm-s3 plugin for Amazon S3.
+-->To install the helm-s3 plugin on your client machine, run the following command: 
+$ helm plugin install https://github.com/hypnoglow/helm-s3.git
+##Initialize the Amazon S3 Helm repository.
+-->To initialize the target folder as a Helm repository, use the following command: 
+$ helm s3 init s3://my-helm-charts/stable/myapp 
+-->The command creates an index.yaml file in the target to track all the chart information that is stored at that location.
+##Verify the newly created Helm repository.
+-->To verify that the index.yaml file was created, run the following command: 
+$ aws s3 ls s3://my-helm-charts/stable/myapp/
+##Add the Amazon S3 repository to Helm on the client machine.
+$ To add the target repository alias to the Helm client machine, use the following command: 
+$ helm repo add stable-myapp s3://my-helm-charts/stable/myapp/
+##Package the local Helm chart.
+-->To package the chart that you created or cloned, use the following command: 
+$ helm package ./my-app  
+-->As an example, this pattern uses the my-app chart. The command packages all the contents of the my-app chart folder into an archive file, which is named using the version number that is mentioned in the Chart.yaml file.
+##Store the local package in the Amazon S3 Helm repository.
+$ To upload the local package to the Helm repository in Amazon S3, run the following command: 
+$ helm s3 push ./my-app-0.1.0.tgz stable-myapp
+In the command, my-app is your chart folder name, 0.1.0 is the chart version mentioned in Chart.yaml, and stable-myapp is the target repository alias.
+##Search for the Helm chart.
+-->To confirm that the chart appears both locally and in the Amazon S3 Helm repository, run the following command: 
+$ helm search repo stable-myapp
+########helm Chart repository create in S3 AWS
+##To push a Docker image to an Amazon ECR repository
+1. Authenticate your Docker client to the Amazon ECR registry to which you intend to push your image.
+$ aws ecr get-login-password --region region | docker login --username AWS --password-stdin aws_account_id.dkr.ecr.region.amazonaws.com
+2. If your image repository does not exist in the registry you intend to push to yet, create it. For more information, see Creating a private repository.
+3.Identify the local image to push. Run the docker images command to list the container images on your system.
+$ docker images
+4.Tag your image with the Amazon ECR registry, repository, and optional image tag name combination to use. The registry format is aws_account_id.dkr.ecr.region.amazonaws.com.
+$ docker tag e9ae3c220b23 aws_account_id.dkr.ecr.region.amazonaws.com/my-repository:tag
+5.Push the image using the docker push command:
+$ docker push aws_account_id.dkr.ecr.region.amazonaws.com/my-repository:tag
+Note:
+The same steps we doing cli that we can do through jenkins pipeline. We doing in below pipeline
+##pipeline
+pipeline {
+    environment {
+       AWS_ACCOUNT_ID="857751058578"
+        AWS_DEFAULT_REGION="ap-south-1"
+        IMAGE_REPO_NAME="myown-docker-repository"
+        IMAGE_TAG="dhanapal-v1"
+        REPOSITORY_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${IMAGE_REPO_NAME}"
+        HELM_PACKAGE_NAME = "test" 
+    }
+    agent  {
+        label 'docker-node'
+    }
+    tools {
+        maven 'maven-3.8.6'
+    }
+    stages {
+        stage('Checkout'){
+           steps {
+               git 'https://github.com/dhanapal703278/maven.git'
+           }
+        }
+        stage('helm chart to S3 bucket') {
+            steps {
+                script {
+                    dir('kubernetes/') {
+                        sh '''
+                           helmversion=$( helm show chart ${HELM_PACKAGE_NAME} | grep version | cut -d: -f 2 | tr -d ' ')
+                           helm s3 init s3://myartifact-store/helm-charts/ ##inits chart repository in 'myartifact-store' bucket under 'helm-charts' path.
+                           helm package ${HELM_PACKAGE_NAME}
+                           helm s3 push ./epicservice-0.5.1.tgz kuberntes ##- uploads chart file 'epicservice-0.5.1.tgz' from the current directory to the repository with name 'my-repo'
+                        '''
+                    }
+                }
+            }
+                
+        } 
+         // OR we can go with ECR for pushing helm charts
+        stage('helm chart to ECR') {
+            steps {
+                script {
+                    dir('kubernetes/') {
+                        sh '''
+                           helmversion=$( helm show chart test | grep version | cut -d: -f 2 | tr -d ' ')
+                           helm package ${HELM_PACKAGE_NAME}
+                           aws ecr create-repository      --repository-name helm-test-chart      --region ap-south-1
+                           aws ecr get-login-password      --region ${AWS_DEFAULT_REGION} | helm registry login      --username AWS      --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+                           helm push ${HELM_PACKAGE_NAME}-${helmversion}.tgz oci://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/
+                        '''
+                    }
+                }
+            }
+                
+        }
         
     }
+    
 }
 
 #################pipeline  of option use##############
@@ -1638,8 +1744,8 @@ $ systemctl restart nginx
 ->manage jenkins->manage plugins->Periodic Backup(search available)->Periodic Backup(select)->install(without restart)
 ->now to go jenkins server create a directory for storing jenkins backup data.
 $ mkdir /opt/backup-jenkins-data
-$chown -R jenkins:jenkins /opt/backup-jenkins-data
-->Again to manage jenkins->configure system->Periodic Backup Manager->click here to configure it->
+$ chown -R jenkins:jenkins /opt/backup-jenkins-data
+->Again to manage jenkins->configure system->Periodic Backup Manager(last down)->click here to configure it->
 ->Root Directory=/var/lib/jenkins
 ->Temporary Directory=/tmp
 ->Backup schedule (cron)=30 * * * * (every day  30 minutes)
@@ -1960,7 +2066,7 @@ pipeline {
     }
 }
 
--------------
+#####################build time##########
 dev builds (every  monday and thusday)
 prod builds (wensday)
 UAT builds(tue)   
