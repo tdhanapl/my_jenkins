@@ -19,7 +19,7 @@ It  is the process by which qualified changes in software code or architecture a
 ##security tools:
 1.Veracode--source code scan
 2.trivy-image-scan--docker image scan
-3. codcay--source code scan
+3.codcay--source code scan
 
 ##pipeline
 1.tools
@@ -129,22 +129,23 @@ List of Maven installations on this system
 
 #####################Integrate Your GitHub Repository to Your Jenkins Project##################################
 Configuring GitHub
-Step 1: go to your GitHub repository and click on ‘Settings
-Step 2: Click on Webhooks and then click on ‘Add webhook’.
-Step 3: In the ‘Payload URL’ field, paste your Jenkins environment URL.
+Step 1: go to your GitHub repository and click on Settings
+Step 2: Click on Webhooks and then click on Add webhook.
+Step 3: In the Payload URL field, paste your Jenkins environment URL.
  ->At the end of this URL add /github-webhook/. 
  Payload URL= https://13.127.199.143:8080/github-webhook
 step 4:
-->In the ‘Content type’ select: ‘application/json’ and leave the ‘Secret’ field empty.
+->In the Content type select: application/json and leave the Secret field empty.
 Step 5: 
 Which events would you like to trigger this webhook?
 Just the push event.
 ->mark Send me everything.
-In the page ‘Which events would you like to trigger this webhook?’ choose ‘Let me select Send me everything.’ Then, check ‘Pull Requests’ and ‘Pushes’. 
-At the end of this option, make sure that the ‘Active’ option is checked and click on ‘Add webhook’.
+In the page Which events would you like to trigger this webhook? choose Let me select Send me everything. Then, check ‘Pull Requests’ and ‘Pushes’. 
+At the end of this option, make sure that the Active option is checked and click on Add webhook.
+
 ###Configuring from  Jenkins side
-Step 5: In Jenkins, click on ‘New Item’ to create a new project.
-Step 6: Give your project a name, then choose ‘Pipeline’ and finally, click on ‘OK’.click pipeline project->click build trigger-
+Step 5: In Jenkins, click on New Item to create a new project.
+Step 6: Give your project a name, then choose Pipeline and finally, click on OK.click pipeline project->click build trigger-
 ------->mark github hook trigger for GITSCM polling----->click apply.
 
 ################################Jenkins master--Slave configuration######################
