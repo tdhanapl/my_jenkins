@@ -38,7 +38,7 @@ It  is the process by which qualified changes in software code or architecture a
             //mail to: team@example.com, subject: 'The Pipeline failed :('
         }
 		sucess {
-			// mail to: dhanapal703278@gmail.com, subject: The Pipeline sucess 
+			// mail to: XXX@gmail.com, subject: The Pipeline sucess 
 		}
     }
 ## Requried plugin
@@ -306,7 +306,7 @@ pipeline{
     //customWorkspace '/root'
     //image 'dhanapal406/jenkins_java_git_maven-3.8.5'
     //label 'docker-node'
-    //registryCredentialsId 'username=dhana, password=ikt@406'
+    //registryCredentialsId 'username=dhana, password=xxxxx@4x6'
     //reuseNode true
   }
 }
@@ -645,7 +645,7 @@ Jenkins provides several environment variables by default like - BRANCH_NAME, BU
 ->Global credentials (unrestricted)->New credentials
 ->Kind= Username with password
 ->Scope= Global (Jenkins, nodes, items, all child items, etc)
-->Username= dhanapal406(mark Treat username as secret)
+->Username= dhanapalxx (mark Treat username as secret)
 ->Password= •••••••••
 ->ID= docker_login
 ->Description= docker_login
@@ -2059,7 +2059,7 @@ pipeline {
             //mail to: team@example.com, subject: 'The Pipeline failed :('
         }
 		sucess {
-			// mail to: dhanapal703278@gmail.com, subject: The Pipeline sucess 
+			// mail to: dhanapalXXXXX@gmail.com, subject: The Pipeline sucess 
 		}
     }
 }
