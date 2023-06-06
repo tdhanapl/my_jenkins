@@ -1,7 +1,4 @@
 #######################Configuration ##############################
-jenkins server login deatils
-username=ec2-user
-pass=ikt@123
 ###Home directory for jenkins
 By default, Jenkins stores all of its data in this directory on the file system
 $ ll /var/lib/jenkins
