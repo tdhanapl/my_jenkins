@@ -1,10 +1,23 @@
 #######################Configuration ##############################
-jenkins server login deatils
-username=ec2-user
-pass=ikt@123
 ###Home directory for jenkins
 By default, Jenkins stores all of its data in this directory on the file system
 $ ll /var/lib/jenkins
+
+###To store jenkins logs in server
+##we need to add environment ib jenkins.service(/etc/systemd/system/)
+$ vim jenkins.service
+[Service]
+Environment="JENKINS_LOG=%L/jenkins/jenkins.log"
+Note:
+1. we can check jenkin logs in console output.
+2. we check jenkins dashboard ->manage jenkins ->system log
+3. we can in jenkins server in /var/log/jenkins
+
+########jenkins document site
+https://www.jenkins.io/doc/
+https://www.jenkins.io/doc/book/pipeline/syntax/#options
+####refernces these site for shared libary in jenkins
+https://www.lambdatest.com/blog/use-jenkins-shared-libraries-in-a-jenkins-pipeline/?s=08
 
 ##what is Continuous Integration,Continuous delivery,and Continuous Deployment.
 #Continuous Integration (CI)
@@ -22,18 +35,20 @@ It  is the process by which qualified changes in software code or architecture a
 3.codcay--source code scan
 
 ##pipeline
-1.tools
-2.agent
-3.stage(git checkout)
-4.stage(SonarQube analysis and Quality gate check)
+1.agent
+2.tools
+3.options
+4.stage(git checkout)
 5.stage(source code bulit)
-6.stage(deploy artifact to jfrog/nexu/s3 bucket)
-8.stage(Bulid docker image with artifact and push to jfrog/s3 bucket) 
-9.stage(identifying misconfigs using datree in helm charts)
-10.stage(pushing the helm charts to jfrog/s3)
-11.stage(manual approval for deploy in k8s development/pre-production environment)
-12.stage(Deploying application on k8s eks cluster)
-13.post{
+6.stage(test with junit and jacoco code)
+8.stage(SonarQube analysis and Quality gate check)
+9.stage(deploy artifact to jfrog/nexu/s3 bucket)
+10.stage(Bulid docker image with artifact and push to jfrog/s3 bucket) 
+11.stage(identifying misconfigs using datree in helm charts)
+12.stage(pushing the helm charts to jfrog/s3)
+13.stage(manual approval for deploy in k8s development/pre-production environment)
+14.stage(Deploying application on k8s eks cluster)
+15.post{
         always {
             junit '**/target/*.xml'
         }
@@ -41,26 +56,27 @@ It  is the process by which qualified changes in software code or architecture a
             //mail to: team@example.com, subject: 'The Pipeline failed :('
         }
 		sucess {
-			// mail to: dhanapal703278@gmail.com, subject: The Pipeline sucess 
+			// mail to: XXX@gmail.com, subject: The Pipeline sucess 
 		}
     }
+
 ## Requried plugin
 1. File system scm plugin---->Filesystem Checkout
 2. SonarQube scanner plugin for jenkins--->SonarQube integration
-3.JaCoCo plugin----> JaCoCo code coverage
+3. JaCoCo plugin----> JaCoCo code coverage
 4. Nexus Platform Plugin----->Nexus repository for storing repository
 5. Email Extension Plugin----> Email Intergation
 6. Deploy to container plugin--->Deploy to tomcat
-7. Docker Pipeline---->Build and use Docker containers from pipelines.
+7. Docker Pipeline---->Build and use Docker containers from pipelines
 8. Docker plugin--->This plugin integrates Jenkins with Docker
 9. S3 publisher plugin---> upload artifacts to s3
 10 SonarScanner-->For test code 
 11 Amazon ECR plugin--->This plugin generates Docker authentication token from Amazon Credentials to access Amazon ECR.
-12.Nexus Artifact Uploader--->This plugin to upload the artifact to Nexus Repository.
-13.Nexus Platform Plugin--->This plugin integrates Sonatype Nexus to Jenkins.
+12. Nexus Artifact Uploader--->This plugin to upload the artifact to Nexus Repository.
+13. Nexus Platform Plugin--->This plugin integrates Sonatype Nexus to Jenkins.
 14. Pipeline Utility StepsVersion--->Utility steps for pipeline jobs.
 Note: This above plugin is required for nexus artifact upload
-14.kubernetes--->This plugin integrates Jenkins with Kubernetes
+14. kubernetes--->This plugin integrates Jenkins with Kubernetes
 15. git, Build Timestamp Plugin, Build Timeout, Credentials, Pull Request Builder, Docker Pipeline, Email Extension,github,
    pipeline, maven, artifact, Role-based Authorization Strategy, bule ocean, input, kubernetes deploy, helm.	
 
@@ -75,6 +91,32 @@ Note: This above plugin is required for nexus artifact upload
 #kubernetes version=1.19
 #ansible version=2.10
 #git=2.30
+
+###################Periodic Backup(plug-in)###############
+#Backup plugin allows archiving and restoring your Jenkins (and Hudson) home directory.
+#With Periodic Backup we schudle cron jobs for backup perpouse
+->Now go to jenkins 
+->manage jenkins->manage plugins->Periodic Backup(search available)->Periodic Backup(select)->install(without restart)
+->now to go jenkins server create a directory for storing jenkins backup data.
+$ mkdir /opt/backup-jenkins-data
+$chown -R jenkins:jenkins /opt/backup-jenkins-data
+->Again to manage jenkins->configure system->Periodic Backup Manager->click here to configure it->
+->Root Directory=/var/lib/jenkins
+->Temporary Directory=/tmp
+->Backup schedule (cron)=30 * * * * (every day  30 minutes)
+->Maximum backups in location=20
+->Store no older than (days)=15
+->File Management Strategy= ConfigOnly/FullBackup
+->Storage Strategy=Tar.GzStorage
+->Backup Location=/opt/backup-jenkins-data
+->mark enable this location
+->click validate
+->clik save
+###For taking backup 
+-> click Backup Now
+###For restore backup  
+##if any important job deletd means we can restore with this 
+-> click restore
 
 ########################################Installation  maveen##############################
 $ cd /opt
@@ -106,17 +148,18 @@ $ bash
 mvn --version
 
 ######################configure maven in jenkins#############
-##this use for if it required to bulid in par version only on that time we can add  that version
+##this use for if it required to bulid in per version only on that time we can add  that version
 #we bulid with particular version
 ->Now go to jenkins 
 ->manage jenkins->Global Tool Configuration
 ->Maven installations
-List of Maven installations on this system
+  List of Maven installations on this system
 ->Maven
 ->Name= maven-3.8.5 (label name of maven ) #3.8.5 is version
 ->MAVEN_HOME= /opt/maven/ #/opt/maven/ home of maven path  and/opt/maven/bin path variables
 ->click save
 -> click apply
+
 ###add one more maven version 
 ->Now go to jenkins 
 ->manage jenkins->Global Tool Configuration
@@ -144,9 +187,11 @@ In the page Which events would you like to trigger this webhook? choose Let me s
 At the end of this option, make sure that the Active option is checked and click on Add webhook.
 
 ###Configuring from  Jenkins side
-Step 5: In Jenkins, click on New Item to create a new project.
-Step 6: Give your project a name, then choose Pipeline and finally, click on OK.click pipeline project->click build trigger-
-------->mark github hook trigger for GITSCM polling----->click apply.
+Step 6: In Jenkins, click on New Item to create a new project.
+Step 7: Give your project a name, then choose Pipeline and finally, click on OK.click pipeline project
+->click build trigger
+->mark github hook trigger for GITSCM polling
+->click apply.
 
 ################################Jenkins master--Slave configuration######################
 #adding agent with Launch method via Launch agents via SSH
@@ -184,7 +229,8 @@ $ ssh-copy-id  -i /root/.ssh/id_rsa <username@10.10.1.173>
 	---this way we can copy ssh private keys
 ##Now in jenkins
 ->Adding the slave node to the master
-->Log in to the Jenkins console via the browser and click on "Manage Jenkins" and scroll down to the bottom. From the list click on "Manage Nodes". In the new window click on "New Node".
+->Log in to the Jenkins console via the browser and click on "Manage Jenkins" and scroll down to the bottom. 
+->From the list click on "Manage Nodes". In the new window click on "New Node".
 ->Add new node
 ->Give a name to the node, select Permanent Agent and click on OK
 ->Jenkins Slave Node name
@@ -202,7 +248,6 @@ $ ssh-copy-id  -i /root/.ssh/id_rsa <username@10.10.1.173>
 ->Slave node list
 ->Troubleshooting
 ->You can click on the slave node and from there you can view the log. Fix any error shown in the log
--------
 
 ##########pipeline running in slave node###########
 -----
@@ -230,7 +275,6 @@ pipeline{
                 jacoco()
             }
         }
-        
         stage('Post tasks') {
             steps {
                 sh "echo send an email"
@@ -257,6 +301,7 @@ RUN  apt update -y \
      && ln -s /opt/maven/bin/mvn /usr/bin/mvn \
      && export PATH=$PATH:/opt/maven/bin \
      &&  echo $PATH
+
 CMD  ["mvn", "--version"]
 :wq
 
@@ -309,7 +354,7 @@ pipeline{
     //customWorkspace '/root'
     //image 'dhanapal406/jenkins_java_git_maven-3.8.5'
     //label 'docker-node'
-    //registryCredentialsId 'username=dhana, password=ikt@406'
+    //registryCredentialsId 'username=dhana, password=xxxxx@4x6'
     //reuseNode true
   }
 }
@@ -319,7 +364,9 @@ pipeline{
 ############################################SonarQube intergration with jenkins################################################################
 #######installation of Sonarqube
 ##https://www.jenkins.io/doc/pipeline/steps/sonar/
-#do not all this things with root and created separate username as sonaruser
+Note:
+Do not all this things with root and created separate username as sonaruser.
+
 $ wget https://binaries.sonarsource.com/Distribution/sonarqube/sonarqube-8.9.6.50800.zip
 $ apt install unzip 
 $ unzip sonarqube-8.9.6.50800.zip
@@ -349,8 +396,9 @@ go website
  uersname=admin default
  password=admin default
  oldpassword=admin
- newpassword=ikt@406
- confirm password=ikt@406
+ newpassword=XXXxxx
+ confirm password=xxxx
+
  #now go to SonarQube server to create token
  -->click Administartor->security->users->click tokens->Generate tokens=jenkins->generate->copy that token
  #Now goto jenkins continue to before part
@@ -383,14 +431,14 @@ go website
             
             stage("build & SonarQube analysis") {
                 steps {
-              withSonarQubeEnv('My SonarQube Server') {
-                sh 'mvn clean package sonar:sonar'
-                //sh '''mvn sonar:sonar \\
-                //-Dsonar.projectKey=maven-jenkins-pipeline \\
-                //-Dsonar.host.url=http://13.126.108.209:9000/'''
+                    withSonarQubeEnv('My SonarQube Server') {
+                        sh 'mvn clean package sonar:sonar'
+                    //sh '''mvn sonar:sonar \\
+                    //-Dsonar.projectKey=maven-jenkins-pipeline \\
+                    //-Dsonar.host.url=http://13.126.108.209:9000/'''
+                    }
                 }
             }
-          }
           
         }
         post{
@@ -493,12 +541,14 @@ pipeline {
 -->Email: Enter your email address.
 -->Status: Select Active from your drop-down menu.
 -->Roles: Make sure that you grant the nx-admin role to your user.
+
 ##With this, we are through with the setup part of Nexus Repository Manager. Let us move to Jenkins to setup Nexus there.
--->Install and Configure Nexus Plugins in Jenkins
+-->Install and Configure Nexus Plugins in Jenkins.
 -->Here you are going to install and configure a few plugins for Nexus in Jenkins.
 -->Go to Jenkins-->Dashboard-->Manage Jenkins-->Manage Plugins > Available and search and install Nexus Artifact Uploader and Pipeline Utility Steps.
 -->Add Nexus Repository Manager’s user credentials in Jenkins.
 -->Go to Dashboard > Credentials > System > Global credentials (unrestricted)
+
 ##Create a Jenkins Pipeline
 -->It’s time to create a Jenkins Job. Here you are going to use Pipeline job type, named as JenkinsNexus
 
@@ -648,7 +698,7 @@ Jenkins provides several environment variables by default like - BRANCH_NAME, BU
 ->Global credentials (unrestricted)->New credentials
 ->Kind= Username with password
 ->Scope= Global (Jenkins, nodes, items, all child items, etc)
-->Username= dhanapal406(mark Treat username as secret)
+->Username= dhanapalxx (mark Treat username as secret)
 ->Password= •••••••••
 ->ID= docker_login
 ->Description= docker_login
@@ -706,8 +756,7 @@ pipeline{
                     label 'docker-node'
 					alwaysPull true
                     
-                }
-                
+                }    
             }
             steps{
                 git 'https://github.com/dhanapal703278/tomcat_maven_app.git'
@@ -2024,7 +2073,12 @@ pipeline {
 			steps{
 				mvn clean install 
 				}
-			} 
+			}
+         stage('Test') {
+            steps {
+                sh 'mv test'
+            }
+        } 
 		stage('Scan') {
 			steps {
 				withSonarQubeEnv(installationName: 'sonarjenkins') { 
@@ -2041,19 +2095,14 @@ pipeline {
             }
         }
 //	    stage('SonarQube analysis') {
-//      def scannerHome = tool 'SonarScanner 4.0';
-//        steps{
-//       withSonarQubeEnv('sonarqube-8.9') { 
-//      If you have configured more than one global server connection, you can specify its name
-//            sh "${scannerHome}/bin/sonar-scanner"
-//          sh "mvn sonar:sonar"
+//          def scannerHome = tool 'SonarScanner 4.0';
+//          steps{
+//              withSonarQubeEnv('sonarqube-8.9') { 
+//                  If you have configured more than one global server connection, you can specify its name
+//                     sh "${scannerHome}/bin/sonar-scanner"
+//                      sh "mvn sonar:sonar"
         }
-        stage('Test') {
-            steps {
-                sh 'make check'
-            }
-        }
-  
+       
     post {
         always {
             junit '**/target/*.xml'
@@ -2062,12 +2111,13 @@ pipeline {
             //mail to: team@example.com, subject: 'The Pipeline failed :('
         }
 		sucess {
-			// mail to: dhanapal703278@gmail.com, subject: The Pipeline sucess 
+			// mail to: dhanapalXXXXX@gmail.com, subject: The Pipeline sucess 
 		}
     }
 }
 
 #####################build time##########
+UAT builds(tue) 
 dev builds (every  monday and thusday)
 prod builds (wensday)
-UAT builds(tue)   
+  
