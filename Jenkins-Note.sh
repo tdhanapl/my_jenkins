@@ -4,7 +4,7 @@ By default, Jenkins stores all of its data in this directory on the file system
 $ ll /var/lib/jenkins
 
 ###To store jenkins logs in server
-##we need to add environment ib jenkins.service(/etc/systemd/system/)
+##we need to add environment in jenkins.service(/etc/systemd/system/)
 $ vim jenkins.service
 [Service]
 Environment="JENKINS_LOG=%L/jenkins/jenkins.log"
@@ -225,8 +225,8 @@ Copy the content and log in to the slave node. Add the copied content to authori
 ->From the master ssh to the slave node. It will ask to accept the ssh fingerprint, type yes and enter. 
 If you haven’t done anything wrong you should be able to ssh into the slave node.
 		or copy of ssh keys with command
-$ ssh-copy-id  -i /root/.ssh/id_rsa <username@10.10.1.173>
-	---this way we can copy ssh private keys
+$ ssh-copy-id  -i /root/.ssh/id_rsa.pub <username@10.10.1.173>
+	---this way we can copy ssh public  keys
 ##Now in jenkins
 ->Adding the slave node to the master
 ->Log in to the Jenkins console via the browser and click on "Manage Jenkins" and scroll down to the bottom. 
@@ -1706,8 +1706,7 @@ http://<jfrog server ip:8081/artifactory>
 2.Go to Admin area navigate to Users Click on “New User” button.
 3. Enter the desired fields and make sure to mark Disable UI Access (We are using this user only for connectivity between Jenkins and Jforg Artifactory not to access the UI)
 4. Click save.
-##3. Creating Maven repository in Jfrog
-
+##Creating Maven repository in Jfrog
 #Integration Steps
 ->Login to Jenkins to integrate Artifactory with Jenkins
 ->Install "Artifactory" plug-in
@@ -1721,6 +1720,104 @@ http://<jfrog server ip:8081/artifactory>
 ->Password : redhat
 ->click test connection->here found Artifactory version 
 
+##########jenkins integarting with ansible#######
+#Install the Ansible plugin
+->Manage Jenkins -> Jenkins Plugins -> available ->Ansible plugin-> select without restart.
+#Configure Ansible in global Tool Configuration
+->Dashboard->manage jenkins->Tools(Global Tool Configuration)
+->Ansible->click add Ansible->Name: ansible_server
+->Path to ansible executables directory: /usr/bin
+->click save
+#####Jenkins pipeline
+pipeline {
+    agent {
+        label "node1"
+    }
+    stages {
+        stage('gitcheckout') {
+            steps {
+                //Get some code from a GitHub repository
+                git branch: 'main', url: 'https://github.com/tdhanapl/python_scripting.git'
+            }
+        }
+        stage('ansible playbook') {
+            steps {
+                ansiblePlaybook colorized: true, credentialsId: 'ansible_server', disableHostKeyChecking: true, forks: 30, installation: 'ansible_server', inventory: 'dhana_inventory', playbook: 'httpd_installation_role.yml'
+            }
+        }
+    }
+}
+##Note:
+ansible playbook is taken from github 
+
+######terraform integarte with jekins#####
+#Install the terraform plugin
+->Manage Jenkins -> Jenkins Plugins -> available ->terraform plugin & CloudBees AWS CredentialsVersion-> select without restart.
+#add aws credentials(access key and secert key)
+->Dashboard->Manage Jenkins->Credentials->System Global credentials (unrestricted)
+->Scope: Global (Jenkins, nodes, items, all child items, etc)
+->ID: terraform_credentials
+->Description: terraform
+->Access Key ID: AxIAxxR4PxxxxRHxxOT
+->Secret Access Key: Mxxxxx1d3xVModp/xxxxxDDBS324225Bxj
+->Click save
+#Configure terraform in global Tool Configuration
+->Dashboard->manage jenkins->Tools(Global Tool Configuration)
+->Terraform->click add Terraform->Name: terraform_configuration 
+->Install directory:  /usr/bin/
+->click save 
+
+###Terraform pipeline 
+pipeline {
+    agent {
+        label "node1"
+    }
+    tools {
+        terraform "terraform_configuration"
+    }
+
+    stages {
+        stage('git checkout') {
+            steps {
+                git branch: 'main', changelog: false, poll: false, url: 'https://github.com/tdhanapl/aws_notes_terraform.git'
+            }
+        }
+        stage('terraform') {
+            steps {
+                dir('11.iam_user') {
+                    //sh 'terraform init'
+                    //sh 'terraform plan'
+                    sh 'terraform destroy --auto-approve'
+                }
+            }
+        }
+        stage('crearing vpc terraform') {
+            steps {
+                dir('1.vpc') {
+                    sh 'terraform init'
+                    sh 'terraform plan'
+                    //sh 'terraform apply --auto-approve'
+                }
+            }
+        }
+    }
+}
+##note 
+->We are using different folder from github like(1.vpc &11.iam_user)  for creating different resource.
+->if it is directly from file from github we do not need dir stage in pipeline.
+####trivy integrate with jekins#####
+#trivy docker 
+pipeline {
+    agent any
+    stages {
+        stage('Trivy Scan') {
+            steps {
+                // Run the Trivy scan and generate trivy_results.json
+                sh 'trivy image  dhanapal406/tomcat_sai-14:latest'
+            }
+        }
+    }
+}
 
 ###############Reverse Proxy with nginx for jenkin url access########
 #set hostname with FQDN
