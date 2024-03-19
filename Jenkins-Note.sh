@@ -87,10 +87,10 @@ Note: This above plugin is required for nexus artifact upload
 
 ##vsersion
 #jenkins requried java version = 1.18
-#jenkins version=2.300
-#kubernetes version=1.19
+#jenkins version=2.400
+#kubernetes version=1.24
 #ansible version=2.10
-#git=2.30
+#git=2.42
 
 ###################Periodic Backup(plug-in)###############
 #Backup plugin allows archiving and restoring your Jenkins (and Hudson) home directory.
