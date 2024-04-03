@@ -43,12 +43,13 @@ It  is the process by which qualified changes in software code or architecture a
 6.stage(test with junit and jacoco code)
 8.stage(SonarQube analysis and Quality gate check)
 9.stage(deploy artifact to jfrog/nexu/s3 bucket)
-10.stage(Bulid docker image with artifact and push to jfrog/s3 bucket) 
-11.stage(identifying misconfigs using datree in helm charts)
-12.stage(pushing the helm charts to jfrog/s3)
-13.stage(manual approval for deploy in k8s development/pre-production environment)
-14.stage(Deploying application on k8s eks cluster)
-15.post{
+10.stage(Bulid docker image with artifact and push to jfrog/s3 bucket)
+11.stage(scan the image with trivy)
+12.stage(identifying misconfigs using datree in helm charts)
+13.stage(pushing the helm charts to jfrog/s3)
+14.stage(manual approval for deploy in k8s development/pre-production environment)
+15.stage(Deploying application on k8s eks cluster)
+16.post{
         always {
             junit '**/target/*.xml'
         }
